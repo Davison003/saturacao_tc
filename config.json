@@ -1,0 +1,26 @@
+{
+  "presets": {
+    "Default_TPX": {
+      "ct_params": {
+        "ct_ratio": 3000.0,
+        "r_ct": 0.5,
+        "r_b": 1.0,
+        "i_sn": 1.0,
+        "k_h": 1.0,
+        "k_ssc": 1.0,
+        "k_td": 1.0,
+        "v_sat": null,
+        "s": 2.0,
+        "a": 1.0
+      },
+      "sim_params": {
+        "frequency_hz": 60.0,
+        "n_cycles": 5,
+        "ip_fault": 10000.0,
+        "t_const_primary": 0.05,
+        "dt": null
+      }
+    }
+  }
+}
+

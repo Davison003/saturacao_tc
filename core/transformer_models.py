@@ -82,8 +82,11 @@ class BaseTransformer(ABC):
 class TPXTransformer(BaseTransformer):
     """
     TPX-type CT transformer model.
-    Implements a simplified version of the non-linear excitation and flux
-    integration described in the methodology.
+    This class is intentionally structured to keep CT-specific physics isolated.
+
+    Note: the numerical/physical equations should be implemented by you where
+    marked below. The current implementation provides a runnable scaffold that
+    returns correctly-shaped arrays for the UI/plots.
     """
 
     def calculate_saturation_voltage(self) -> float:
@@ -94,6 +97,45 @@ class TPXTransformer(BaseTransformer):
         ct = self.params
         v_sat = ct.k_h * ct.k_ssc * ct.k_td * (ct.r_ct + ct.r_b) * ct.i_sn
         return float(v_sat)
+
+    def _compute_i_ideal(self, t: np.ndarray, sim_params: SimulationParams) -> np.ndarray:
+        """
+        TODO (physics): replace with the exact equation you want to use for
+        i_s,ideal(t) for the TPX case (e.g. per your Eq. 18 / IEC formulation).
+        """
+        omega = 2.0 * np.pi * sim_params.frequency_hz
+        ip = sim_params.ip_fault
+        tp = sim_params.t_const_primary
+        r_tc = self.params.ct_ratio
+        return (np.sqrt(2.0) * ip / r_tc) * (np.exp(-t / tp) - np.cos(omega * t))
+
+    def _update_flux(
+        self,
+        lambda_prev: float,
+        i_ideal_k: float,
+        i_exc_prev: float,
+        dt: float,
+    ) -> float:
+        """
+        TODO (physics): replace this with your discrete-time flux update, e.g.
+        per the incremental formulation in your methodology (Eq. 21 / related).
+        """
+        s = self.params.s
+        a = self.params.a
+        denom = 1.0 + s * a * (abs(lambda_prev) ** (s - 1.0) if s != 1.0 else 1.0)
+        d_lambda = (self.params.ct_ratio * (i_ideal_k - i_exc_prev) / denom) * dt
+        return lambda_prev + d_lambda
+
+    def _compute_excitation_current(self, lambda_k: float) -> float:
+        """
+        TODO (physics): replace with your magnetization curve i_e(lambda),
+        e.g. per Eq. 17 (non-linear) and any TPX-specific adjustments.
+        """
+        s = self.params.s
+        a = self.params.a
+        if lambda_k == 0.0:
+            return 0.0
+        return float(a * (abs(lambda_k) ** s) * np.sign(lambda_k))
 
     def simulate_waveforms(self, sim_params: SimulationParams) -> Waveforms:
         ct = self.params
@@ -109,37 +151,20 @@ class TPXTransformer(BaseTransformer):
 
         t = np.linspace(0.0, total_time, n_samples, endpoint=False)
 
-        # Ideal secondary current (simplified IEC TPX transient expression)
-        omega = 2.0 * np.pi * sim_params.frequency_hz
-        r_tc = ct.ct_ratio
-        ip = sim_params.ip_fault
-        tp = sim_params.t_const_primary
-
-        i_ideal = (np.sqrt(2.0) * ip / r_tc) * (np.exp(-t / tp) - np.cos(omega * t))
+        i_ideal = self._compute_i_ideal(t, sim_params)
 
         # Allocate arrays
         flux = np.zeros_like(t)
         i_exc = np.zeros_like(t)
         i_real = np.zeros_like(t)
 
-        # Parameters for excitation model: i_exc ≈ A * |λ|^S * sign(λ)
-        s = ct.s
-        a = ct.a
-
         for k in range(1, n_samples):
             # Previous state
             lam_prev = flux[k - 1]
             i_exc_prev = i_exc[k - 1]
 
-            denom = 1.0 + s * a * (abs(lam_prev) ** (s - 1.0) if s != 1.0 else 1.0)
-            d_lambda = (r_tc * (i_ideal[k] - i_exc_prev) / denom) * dt
-            lam = lam_prev + d_lambda
-
-            # New excitation current from updated flux
-            if lam == 0.0:
-                i_exc_k = 0.0
-            else:
-                i_exc_k = a * (abs(lam) ** s) * np.sign(lam)
+            lam = self._update_flux(lam_prev, float(i_ideal[k]), float(i_exc_prev), dt)
+            i_exc_k = self._compute_excitation_current(lam)
 
             i_s_real = i_ideal[k] - i_exc_k
 
