@@ -1,26 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Optional
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QComboBox,
-    QDoubleSpinBox,
-    QFormLayout,
-    QGridLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QMainWindow,
-    QMessageBox,
-    QPushButton,
-    QScrollArea,
-    QSpinBox,
-    QSplitter,
-    QVBoxLayout,
-    QWidget,
-)
+from qt_compat import QtCore, QtWidgets
 
 from core.calc_engine import run_simulation
 from core.config import list_presets, load_preset
@@ -34,8 +16,8 @@ def _float_box(
     max_value: float = 1e9,
     decimals: int = 6,
     step: float = 0.1,
-) -> QDoubleSpinBox:
-    box = QDoubleSpinBox()
+) -> QtWidgets.QDoubleSpinBox:
+    box = QtWidgets.QDoubleSpinBox()
     box.setRange(min_value, max_value)
     box.setDecimals(decimals)
     box.setSingleStep(step)
@@ -43,31 +25,31 @@ def _float_box(
     return box
 
 
-class MainWindow(QMainWindow):
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+class MainWindow(QtWidgets.QMainWindow):
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("CT Saturation Simulator")
 
         self._plot = PlotWidget()
 
-        left_panel = QWidget()
-        left_layout = QVBoxLayout()
-        left_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        left_panel = QtWidgets.QWidget()
+        left_layout = QtWidgets.QVBoxLayout()
+        left_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         left_panel.setLayout(left_layout)
 
-        self._preset_combo = QComboBox()
+        self._preset_combo = QtWidgets.QComboBox()
         self._preset_combo.addItems(list_presets())
         self._preset_combo.currentTextChanged.connect(self._on_preset_changed)
 
-        preset_row = QHBoxLayout()
-        preset_row.addWidget(QLabel("Preset"))
+        preset_row = QtWidgets.QHBoxLayout()
+        preset_row.addWidget(QtWidgets.QLabel("Preset"))
         preset_row.addWidget(self._preset_combo, 1)
         left_layout.addLayout(preset_row)
 
-        self._ct_type = QComboBox()
+        self._ct_type = QtWidgets.QComboBox()
         self._ct_type.addItems(["TPX"])
-        ct_type_row = QHBoxLayout()
-        ct_type_row.addWidget(QLabel("CT type"))
+        ct_type_row = QtWidgets.QHBoxLayout()
+        ct_type_row.addWidget(QtWidgets.QLabel("CT type"))
         ct_type_row.addWidget(self._ct_type, 1)
         left_layout.addLayout(ct_type_row)
 
@@ -76,24 +58,24 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self._ct_group)
         left_layout.addWidget(self._sim_group)
 
-        buttons_row = QHBoxLayout()
-        self._btn_run = QPushButton("Run simulation")
+        buttons_row = QtWidgets.QHBoxLayout()
+        self._btn_run = QtWidgets.QPushButton("Run simulation")
         self._btn_run.clicked.connect(self._run_clicked)
-        self._btn_reset = QPushButton("Reset")
+        self._btn_reset = QtWidgets.QPushButton("Reset")
         self._btn_reset.clicked.connect(self._reset_clicked)
         buttons_row.addWidget(self._btn_run)
         buttons_row.addWidget(self._btn_reset)
         left_layout.addLayout(buttons_row)
 
-        self._out_vsat = QLabel("-")
-        self._out_vreq_perm = QLabel("-")
-        self._out_vreq_trans = QLabel("-")
-        self._out_tsat = QLabel("-")
-        self._out_sat_perm = QLabel("-")
-        self._out_sat_trans = QLabel("-")
+        self._out_vsat = QtWidgets.QLabel("-")
+        self._out_vreq_perm = QtWidgets.QLabel("-")
+        self._out_vreq_trans = QtWidgets.QLabel("-")
+        self._out_tsat = QtWidgets.QLabel("-")
+        self._out_sat_perm = QtWidgets.QLabel("-")
+        self._out_sat_trans = QtWidgets.QLabel("-")
 
-        out_group = QGroupBox("Results")
-        out_form = QFormLayout()
+        out_group = QtWidgets.QGroupBox("Results")
+        out_form = QtWidgets.QFormLayout()
         out_form.addRow("V_sat [V]", self._out_vsat)
         out_form.addRow("V_req_perm [V]", self._out_vreq_perm)
         out_form.addRow("V_req_trans [V]", self._out_vreq_trans)
@@ -103,27 +85,27 @@ class MainWindow(QMainWindow):
         out_group.setLayout(out_form)
         left_layout.addWidget(out_group)
 
-        scroll = QScrollArea()
+        scroll = QtWidgets.QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(left_panel)
 
-        splitter = QSplitter()
+        splitter = QtWidgets.QSplitter()
         splitter.addWidget(scroll)
         splitter.addWidget(self._plot)
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
 
-        container = QWidget()
-        container_layout = QVBoxLayout()
+        container = QtWidgets.QWidget()
+        container_layout = QtWidgets.QVBoxLayout()
         container_layout.addWidget(splitter)
         container.setLayout(container_layout)
         self.setCentralWidget(container)
 
         self._load_preset(self._preset_combo.currentText())
 
-    def _build_ct_group(self) -> QGroupBox:
-        group = QGroupBox("CT parameters")
-        form = QFormLayout()
+    def _build_ct_group(self) -> QtWidgets.QGroupBox:
+        group = QtWidgets.QGroupBox("CT parameters")
+        form = QtWidgets.QFormLayout()
 
         self._ct_ratio = _float_box(min_value=0.0001, step=1.0, decimals=6)
         self._r_ct = _float_box(min_value=0.0, step=0.01, decimals=6)
@@ -155,12 +137,12 @@ class MainWindow(QMainWindow):
         group.setLayout(form)
         return group
 
-    def _build_sim_group(self) -> QGroupBox:
-        group = QGroupBox("Simulation parameters")
-        form = QFormLayout()
+    def _build_sim_group(self) -> QtWidgets.QGroupBox:
+        group = QtWidgets.QGroupBox("Simulation parameters")
+        form = QtWidgets.QFormLayout()
 
         self._freq = _float_box(min_value=1.0, step=1.0, decimals=3)
-        self._n_cycles = QSpinBox()
+        self._n_cycles = QtWidgets.QSpinBox()
         self._n_cycles.setRange(1, 200)
         self._n_cycles.setSingleStep(1)
 
@@ -214,8 +196,8 @@ class MainWindow(QMainWindow):
             ct_type = self._ct_type.currentText()
 
             result = run_simulation(ct_params, sim_params, ct_type=ct_type)
-        except Exception as exc:
-            QMessageBox.critical(self, "Simulation error", str(exc))
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            QtWidgets.QMessageBox.critical(self, "Simulation error", str(exc))
             return
 
         self._out_vsat.setText(f"{result.vsat:.6g}")

@@ -5,20 +5,20 @@ from typing import Optional
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from core.types import SimulationResult
+from qt_compat import QtWidgets
 
 
-class PlotWidget(QWidget):
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+class PlotWidget(QtWidgets.QWidget):
+    def __init__(self, parent: Optional["QtWidgets.QWidget"] = None) -> None:
         super().__init__(parent)
 
         self._figure = Figure(constrained_layout=True)
         self._canvas = FigureCanvas(self._figure)
         self._toolbar = NavigationToolbar(self._canvas, self)
 
-        layout = QVBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self._toolbar)
         layout.addWidget(self._canvas)
         self.setLayout(layout)
