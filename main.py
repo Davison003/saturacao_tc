@@ -8,7 +8,7 @@ from app_ui import MainWindow
 def main() -> int:
     app = QtWidgets.QApplication(sys.argv)
     window = MainWindow()
-    window.resize(1200, 800)
+    window.resize(1200, 850)
     window.show()
     return app.exec()
 
