@@ -32,35 +32,74 @@ def list_presets(path: str | Path | None = None) -> list[str]:
     return names if names else ["Default_TPX"]
 
 
-def load_preset(name: str, path: str | Path | None = None) -> Tuple[CTParams, SimulationParams]:
+def load_preset(
+    name: str, path: str | Path | None = None
+) -> Tuple[CTParams, SimulationParams, str]:
     cfg = load_config(path)
     presets = cfg.get("presets", {})
 
     if name not in presets:
-        # Fallback hardcoded default
+        # Fallback mirrors the public TPX case used by the application.
         return (
-            CTParams(ct_ratio=3000.0, r_ct=0.5, r_b=1.0, i_sn=1.0),
-            SimulationParams(frequency_hz=60.0, n_cycles=5, ip_fault=10000.0, t_const_primary=0.05),
+            CTParams(
+                ct_ratio=3000.0,
+                r_ct=13.85,
+                r_b=5.0,
+                i_sn=1.0,
+                fault_current_rms=28100.0,
+                i_cc_max=28100.0,
+                x_r=11.77,
+                distance_to_fault=200.0,
+                cable_section_area=6.0,
+                burden_reactance=0.0,
+            ),
+            SimulationParams(n_cycles=5),
+            "TPX",
         )
 
     blob = presets[name]
-    ct_blob = blob.get("ct_params", {})
-    sim_blob = blob.get("sim_params", {})
+    ct_blob = dict(blob.get("ct_params", {}))
+    sim_blob = dict(blob.get("sim_params", {}))
+
+    # Version-1 configurations named the waveform fault current ``i_p``.
+    # Accept them on load, but save only the unambiguous newer field.
+    if "fault_current_rms" not in ct_blob:
+        ct_blob["fault_current_rms"] = ct_blob.pop(
+            "i_p", ct_blob.get("i_cc_max", 0.0)
+        )
+
+    # Fill fields absent from early presets so old saved studies still open.
+    ct_blob.setdefault("i_cc_max", ct_blob["fault_current_rms"])
+    ct_blob.setdefault("x_r", 1.0)
+    ct_blob.setdefault("distance_to_fault", 1.0)
+    ct_blob.setdefault("cable_section_area", 1.0)
+    ct_blob.setdefault("rated_voltage_kv", 0.0)
+    ct_blob.setdefault("burden_reactance", 0.0)
+    # The simplified application deliberately fixes these source-calculator
+    # assumptions. Old presets may contain editable values, but loading them
+    # must not quietly create a different fault case from the visible UI.
+    ct_blob["dc_offset"] = 1.0
+    ct_blob["remanence_pu"] = 0.0
+    sim_blob.pop("t_const_primary", None)
+    sim_blob.pop("ip_fault", None)
 
     ct = CTParams(**ct_blob)
     sim = SimulationParams(**sim_blob)
-    return ct, sim
+    ct_type = str(blob.get("ct_type", "TPX")).upper()
+    return ct, sim, ct_type
 
 
 def save_preset(
     name: str,
     ct_params: CTParams,
     sim_params: SimulationParams,
+    ct_type: str = "TPX",
     path: str | Path | None = None,
 ) -> None:
     cfg = load_config(path)
     cfg.setdefault("presets", {})
     cfg["presets"][name] = {
+        "ct_type": ct_type.upper(),
         "ct_params": asdict(ct_params),
         "sim_params": asdict(sim_params),
     }
